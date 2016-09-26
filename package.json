@@ -1,0 +1,29 @@
+{
+  "name": "artik-stream",
+  "description": "Samsung Artik Stream Plugin for the Reekoh IoT Platform. Fetch data from Samsung Artik Cloud and Devices for ingestion into a Reekoh instance.",
+  "version": "1.0.0",
+  "author": "Reekoh, Inc.",
+  "main": "app.js",
+  "scripts": {
+    "test": "gulp test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Reekoh/artik-stream"
+  },
+  "dependencies": {
+    "async": "^2.0.1",
+    "request": "^2.75.0"
+  },
+  "devDependencies": {
+    "gulp": "^3.9.1",
+    "gulp-cli": "^1.2.1",
+    "gulp-jshint": "^2.0.1",
+    "gulp-json-lint": "^0.1.0",
+    "gulp-mocha": "^2.2.0",
+    "gulp-plumber": "^1.1.0",
+    "mocha": "^2.5.3",
+    "should": "^9.0.2"
+  },
+  "license": "LGPL-3.0"
+}
