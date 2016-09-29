@@ -57,15 +57,24 @@ describe('Stream', function () {
 		});
 
 		describe('#sync', function () {
-			this.timeout(10000);
+			this.timeout(20000);
 			it('should sync latest data of every device', function(done) {
+				let isCalled = false;
 				artikStream.send({
 					type: 'sync',
 					data: {
 						last_sync_dt: new Date('12-12-1970')
 					}
-				}, function() {
-					done();
+				});
+
+				artikStream.on('message', function (message) {
+					if (message.type === 'data') {
+						console.log(message.data);
+						if (!isCalled) {
+							done();
+							isCalled = true;
+						}
+					}
 				});
 			});
 		});
