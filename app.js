@@ -1,11 +1,61 @@
 'use strict';
 
-var platform = require('./platform'),
-	request = require('request'),
-	async = require('async'),
-	client_id,
-	client_secret,
-	user_id;
+const   TOKEN_ENDPOINT       = 'https://accounts.artik.cloud/token',
+        ARTIK_CLOUD_ENDPOINT = 'https://api.artik.cloud/v1.1';
+
+var get      = require('lodash.get'),
+    async    = require('async'),
+    request  = require('request'),
+    platform = require('./platform'),
+    isEmpty  = require('lodash.isempty'),
+    config;
+
+let getDevicesIds = function (devices, callback) {
+    let devicesIds = [];
+
+    async.waterfall([
+        async.constant(devices),
+        async.asyncify(JSON.parse),
+        (obj, done) => {
+            done(null, get(obj, 'data.devices'));
+        },
+        (devicesArr, done) => {
+            if (isEmpty(devicesArr)) return done(null, []);
+
+            async.each(devicesArr, (device, cb) => {
+                devicesIds.push(device.id);
+                cb();
+            }, (error) => {
+                done(error, devicesIds);
+            });
+        }
+    ], callback);
+};
+
+let processDeviceData = function(device, callback){
+    async.waterfall([
+        async.constant(device),
+        async.asyncify(JSON.parse),
+        (obj, done) => {
+            done(null, get(obj, 'data'));
+        },
+        (deviceData, done) => {
+            if (isEmpty(deviceData)) return done(null);
+
+            async.each(deviceData, (data, cb) => {
+                platform.requestDeviceInfo(data.sdid, function (error, requestId) {
+                    platform.once(requestId, function (deviceInfo) {
+                        if (!deviceInfo)  return  cb(new Error(`Device ${data.sdid} not registered`));
+                        platform.processData(data.sdid, JSON.stringify(data));
+                        cb();
+                    });
+                });
+            }, (error) => {
+                done(error);
+            });
+        }
+    ], callback);
+};
 
 /**
  * Emitted when the platform issues a sync request. Means that the stream plugin should fetch device data from the 3rd party service.
@@ -15,85 +65,101 @@ platform.on('sync', function (lastSyncDate) {
 
 	let startDate = new Date(lastSyncDate).getTime();
 	let endDate = Date.now();
-	let count = 100;
 
 	async.waterfall([
 		(done) => {
-			let clientCredentialsOptions = {
-				method: 'POST',
-				url: 'https://accounts.artik.cloud/token',
-				headers: {
-					'content-type': 'application/x-www-form-urlencoded'
-				},
-				form: { grant_type: 'client_credentials' },
-				auth: {
-					user: client_id,
-					pass: client_secret
-				}
-			};
-			request(clientCredentialsOptions,  (error, response, body) => {
-				if (!error && response.statusCode === 200) {
-					let token = JSON.parse(body).access_token;
-					done(null, token);
-				} else {
-					error = error ? error : new Error(body.error);
-					done(error);
-				}
-			});
+            request.post({
+                url: TOKEN_ENDPOINT,
+                headers: {
+                    'content-type': 'application/x-www-form-urlencoded'
+                },
+                form: {
+                    grant_type: 'client_credentials'
+                },
+                auth: {
+                    user: config.client_id,
+                    pass: config.client_secret
+                }
+            }, (error, response, body) => {
+                if (error)
+                    done(error);
+                else if (body.error || response.statusCode !== 200)
+                    done(new Error(body.error));
+                else
+                    done(null, body);
+            });
 		},
+        (tokenResponse, done) => {
+            async.waterfall([
+                async.constant(tokenResponse),
+                async.asyncify(JSON.parse)
+            ], (parseError, obj) => {
+                if (parseError)
+                    done(parseError);
+                else if (isEmpty(obj.access_token))
+                    done(new Error('Invalid Credentials. No access token was received.'));
+                else
+                    done(null, obj.access_token);
+            });
+        },
 		(token, done) => {
-			let userDevicesOptions = {
-				url: `https://api.artik.cloud/v1.1/users/${user_id}/devices`,
-				headers: {
-					'Content-Type': 'application/json',
-					'Authorization': `Bearer ${token}`
-				}
-			};
+            let devices = [];
+            let hasMoreResults = true;
+            let offset = 0;
 
-			request(userDevicesOptions,  (error, response, body) => {
-				if (!error && response.statusCode === 200) {
-					let data = JSON.parse(body).data;
-					let devices = [];
+            async.whilst(() => {
+                return hasMoreResults;
+            }, (cb) => {
+                    request({
+                        url: `${ARTIK_CLOUD_ENDPOINT}/users/${config.user_id}/devices?offset=${100 * offset}&count=100`,
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        }
+                    }, (error, response, body) => {
+                        if (error)
+                            cb(error);
+                        else if (body.error || response.statusCode !== 200)
+                            cb(new Error(body.error));
+                        else {
+                            offset++;
 
-					data.devices.forEach( (device) => {
-						devices.push(device.id);
-					});
-					done(null, token, devices);
-				} else {
-					error = error ? error : new Error(body.error);
-					done(error);
-				}
-			});
+                            getDevicesIds(body, (syncError, devicesIds) => {
+                                if (error) return cb(error);
+                                if (devicesIds.length <= 0) hasMoreResults = false;
+
+                                devices = devices.concat(devicesIds);
+                                cb();
+                            });
+                        }
+                    });
+                },
+                (err) => {
+                    done(err, token, devices);
+                }
+            );
 		},
 		(token, devices, done) => {
-			async.eachSeries(devices, (device, callback) => {
-				let messagesOptions = {
-					url: `https://api.artik.cloud/v1.1/messages?count=${count}&startDate=${startDate}&endDate=${endDate}&sdid=${device}`,
-					headers: {
-						'Content-Type': 'application/json',
-						'Authorization': `Bearer ${token}`
-					}
-				};
-				request(messagesOptions, (error, response, body) => {
-					if (!error && response.statusCode === 200) {
-						let data = JSON.parse(body).data;
-						data.forEach(function (datum) {
-							platform.requestDeviceInfo(datum.sdid, function (error, requestId) {
-								platform.once(requestId, function (deviceInfo) {
-									if (deviceInfo) {
-										platform.processData(datum.sdid, JSON.stringify(datum));
-									} else {
-										platform.handleException(new Error(`Device ${datum.sdid} not registered`));
-									}
-								});
-							});
-						});
-						callback();
-					} else {
-						error = error ? error : new Error(body.error);
-						callback(error);
-					}
-				});
+            async.eachSeries(devices, (device, cb) => {
+                request({
+                    url: `https://api.artik.cloud/v1.1/messages?count=100&startDate=${startDate}&endDate=${endDate}&sdid=${device}`,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    }
+                }, (error, response, body) => {
+                    if (error)
+                        cb(error);
+                    else if (body.error || response.statusCode !== 200)
+                        cb(new Error(body.error));
+                    else {
+
+                        processDeviceData(body, (processDataError) => {
+                            if (error) return cb(processDataError);
+                            cb();
+                        });
+                    }
+                });
 			}, (error) => {
 				done(error);
 			});
@@ -128,10 +194,7 @@ platform.once('close', function () {
  * @param {object} options The parameters or options. Specified through config.json.
  */
 platform.once('ready', function (options) {
-	client_id = options.client_id;
-	client_secret = options.client_secret;
-	user_id = options.user_id;
-
+    config = options;
 	platform.notifyReady();
 	platform.log('Stream has been initialized.');
 });
