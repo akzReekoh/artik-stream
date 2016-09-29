@@ -161,12 +161,10 @@ platform.on('sync', function (lastSyncDate) {
                     }
                 });
 			}, (error) => {
-			    console.log('Error1', error);
 				done(error);
 			});
 		}
 	], (error) => {
-	    console.log('Error', error);
 		platform.handleException(error);
 	});
 });
