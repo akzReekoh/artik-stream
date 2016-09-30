@@ -10,53 +10,6 @@ var get      = require('lodash.get'),
     isEmpty  = require('lodash.isempty'),
     config;
 
-let getDevicesIds = function (devices, callback) {
-    let devicesIds = [];
-
-    async.waterfall([
-        async.constant(devices),
-        async.asyncify(JSON.parse),
-        (obj, done) => {
-            done(null, get(obj, 'data.devices'));
-        },
-        (devicesArr, done) => {
-            if (isEmpty(devicesArr)) return done(null, []);
-
-            async.each(devicesArr, (device, cb) => {
-                devicesIds.push(device.id);
-                cb();
-            }, (error) => {
-                done(error, devicesIds);
-            });
-        }
-    ], callback);
-};
-
-let processDeviceData = function(device, callback){
-    async.waterfall([
-        async.constant(device),
-        async.asyncify(JSON.parse),
-        (obj, done) => {
-            done(null, get(obj, 'data'));
-        },
-        (deviceData, done) => {
-            if (isEmpty(deviceData)) return done(null);
-
-            async.each(deviceData, (data, cb) => {
-                platform.requestDeviceInfo(data.sdid, function (error, requestId) {
-                    platform.once(requestId, function (deviceInfo) {
-                        if (!deviceInfo)  return  cb(new Error(`Device ${data.sdid} not registered`));
-                        platform.processData(data.sdid, JSON.stringify(data));
-                        cb();
-                    });
-                });
-            }, (error) => {
-                done(error);
-            });
-        }
-    ], callback);
-};
-
 /**
  * Emitted when the platform issues a sync request. Means that the stream plugin should fetch device data from the 3rd party service.
  * @param {date} lastSyncDate Timestamp from when the last sync happened. Allows you to fetch data from a certain point in time.
@@ -103,7 +56,7 @@ platform.on('sync', function (lastSyncDate) {
             });
         },
 		(token, done) => {
-            let devices = [];
+            let devicesIds = [];
             let hasMoreResults = true;
             let offset = 0;
 
@@ -112,9 +65,9 @@ platform.on('sync', function (lastSyncDate) {
             }, (cb) => {
                     request({
                         url: `${ARTIK_CLOUD_ENDPOINT}/users/${config.user_id}/devices?offset=${100 * offset}&count=100`,
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${token}`
+                        json: true,
+                        auth: {
+                            bearer: token
                         }
                     }, (error, response, body) => {
                         if (error)
@@ -122,20 +75,21 @@ platform.on('sync', function (lastSyncDate) {
                         else if (body.error || response.statusCode !== 200)
                             cb(new Error(body.error));
                         else {
+                            let devices = get(body, 'data.devices');
+
+                            if (isEmpty(devices)) hasMoreResults = false;
+
                             offset++;
 
-                            getDevicesIds(body, (syncError, devicesIds) => {
-                                if (error) return cb(error);
-                                if (devicesIds.length <= 0) hasMoreResults = false;
-
-                                devices = devices.concat(devicesIds);
-                                cb();
-                            });
+                            async.each(devices, (device, next) => {
+                                devicesIds.push(device.id);
+                                next();
+                            }, cb);
                         }
                     });
                 },
                 (err) => {
-                    done(err, token, devices);
+                    done(err, token, devicesIds);
                 }
             );
 		},
@@ -143,9 +97,9 @@ platform.on('sync', function (lastSyncDate) {
             async.eachSeries(devices, (device, cb) => {
                 request({
                     url: `https://api.artik.cloud/v1.1/messages?count=100&startDate=${startDate}&endDate=${endDate}&sdid=${device}`,
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
+                    json: true,
+                    auth: {
+                        bearer: token
                     }
                 }, (error, response, body) => {
                     if (error)
@@ -153,11 +107,17 @@ platform.on('sync', function (lastSyncDate) {
                     else if (body.error || response.statusCode !== 200)
                         cb(new Error(body.error));
                     else {
+                        let deviceData = get(body, 'data');
 
-                        processDeviceData(body, (processDataError) => {
-                            if (error) return cb(processDataError);
-                            cb();
-                        });
+                        async.each(deviceData, (data, next) => {
+                            platform.requestDeviceInfo(data.sdid, function (error, requestId) {
+                                platform.once(requestId, function (deviceInfo) {
+                                    if (!deviceInfo)  return  next(new Error(`Device ${data.sdid} not registered`));
+                                    platform.processData(data.sdid, JSON.stringify(data));
+                                    next();
+                                });
+                            });
+                        }, cb);
                     }
                 });
 			}, (error) => {
