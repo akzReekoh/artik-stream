@@ -1,7 +1,5 @@
 'use strict';
 
-const PORT = 8080;
-
 var cp     = require('child_process'),
 	assert = require('assert'),
 	artikStream;
@@ -9,8 +7,15 @@ var cp     = require('child_process'),
 describe('Stream', function () {
 	this.slow(5000);
 
-	after('terminate child process', function () {
-		artikStream.kill('SIGKILL');
+	after('terminate child process', function (done) {
+		console.log('Running after');
+		this.timeout(20000);
+
+		setTimeout(() => {
+			console.log('Killing...');
+			artikStream.kill('SIGKILL');
+			done();
+		}, 19000);
 	});
 
 	describe('#spawn', function () {
@@ -27,7 +32,10 @@ describe('Stream', function () {
 				if (message.type === 'ready')
 					done();
 				else if (message.type === 'requestdeviceinfo') {
-					if (message.data.deviceId === 'fc8ecc16e42446be9411b07d2f10c260') {
+					if (message.data.deviceId === 'fc8ecc16e42446be9411b07d2f10c260' ||
+						message.data.deviceId === '5ccc04ef21d246c4bdb68373b7289433' ||
+						message.data.deviceId === 'cd563817829f407f81928a551d869f1d') {
+						
 						artikStream.send({
 							type: message.data.requestId,
 							data: {
@@ -39,6 +47,9 @@ describe('Stream', function () {
 							type: message.data.requestId
 						});
 					}
+				}
+				else if (message.type === 'data') {
+					console.log(message.data);
 				}
 			});
 
@@ -57,25 +68,13 @@ describe('Stream', function () {
 		});
 
 		describe('#sync', function () {
-			this.timeout(20000);
-			it('should sync latest data of every device', function(done) {
-				let isCalled = false;
+			it('should sync latest data of every device', function (done) {
 				artikStream.send({
 					type: 'sync',
 					data: {
 						last_sync_dt: new Date('12-12-1970')
 					}
-				});
-
-				artikStream.on('message', function (message) {
-					if (message.type === 'data') {
-						console.log(message.data);
-						if (!isCalled) {
-							done();
-							isCalled = true;
-						}
-					}
-				});
+				}, done);
 			});
 		});
 	});
