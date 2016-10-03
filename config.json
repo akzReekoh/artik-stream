@@ -1,20 +1,20 @@
 {
-	"client_id": {
-		"label": "Client ID",
-		"type": "String",
-		"required": true,
-		"help": "Application client ID."
-	},
-	"client_secret": {
-		"label": "Client ID",
-		"type": "String",
-		"required": true,
-		"help": "Application client ID."
-	},
-	"user_id": {
-		"label": "User ID",
-		"type": "String",
-		"required": true,
-		"help": "Artik cloud user id."
-	}
+  "client_id": {
+    "label": "Client ID",
+    "type": "String",
+    "required": true,
+    "help": "Kindly specify the Client ID of your Artik Application."
+  },
+  "client_secret": {
+    "label": "Client Secret",
+    "type": "Password",
+    "required": true,
+    "help": "Kindly specify the Client Secret of your Artik Application."
+  },
+  "user_id": {
+    "label": "User ID",
+    "type": "String",
+    "required": true,
+    "help": "Kindly specify your Samsung Account/User ID."
+  }
 }
