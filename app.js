@@ -84,7 +84,7 @@ platform.on('sync', function (lastSyncDate) {
 					if (error)
 						cb(error);
 					else if (body.error || response.statusCode !== 200)
-						cb(new Error(body.error || response.statusMessage));
+						done(new Error(body.error.message || body.error));
 					else {
 						let devicesTmp = get(body, 'data.devices');
 
@@ -119,7 +119,7 @@ platform.on('sync', function (lastSyncDate) {
 					if (error)
 						cb(error);
 					else if (body.error || response.statusCode !== 200)
-						cb(new Error(body.error || response.statusMessage));
+						done(new Error(body.error.message || body.error));
 					else {
 						let data = get(body, 'data');
 
