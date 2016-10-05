@@ -1,7 +1,7 @@
 {
   "name": "artik-stream",
   "description": "Samsung Artik Stream Plugin for the Reekoh IoT Platform. Fetch data from Samsung Artik Cloud and Devices for ingestion into a Reekoh instance.",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "author": "Reekoh, Inc.",
   "main": "app.js",
   "scripts": {

@@ -48,12 +48,7 @@ platform.on('sync', function (lastSyncDate) {
 					pass: config.client_secret
 				}
 			}, (error, response, body) => {
-				if (error)
-					done(error);
-				else if (body.error || response.statusCode !== 200)
-					done(new Error(body.error));
-				else
-					done(null, body);
+				done(error, body);
 			});
 		},
 		(tokenResponse, done) => {
@@ -63,6 +58,8 @@ platform.on('sync', function (lastSyncDate) {
 			], (parseError, obj) => {
 				if (parseError)
 					done(parseError);
+				else if (obj.error)
+					done(new Error(obj.error));
 				else if (isEmpty(obj.access_token))
 					done(new Error('Invalid Credentials. No access token was received.'));
 				else
@@ -87,7 +84,7 @@ platform.on('sync', function (lastSyncDate) {
 					if (error)
 						cb(error);
 					else if (body.error || response.statusCode !== 200)
-						cb(new Error(body.error));
+						cb(new Error(body.error || response.statusMessage));
 					else {
 						let devicesTmp = get(body, 'data.devices');
 
@@ -122,7 +119,7 @@ platform.on('sync', function (lastSyncDate) {
 					if (error)
 						cb(error);
 					else if (body.error || response.statusCode !== 200)
-						cb(new Error(body.error));
+						cb(new Error(body.error || response.statusMessage));
 					else {
 						let data = get(body, 'data');
 
@@ -135,10 +132,7 @@ platform.on('sync', function (lastSyncDate) {
 			}, done);
 		}
 	], (error) => {
-		if (error) {
-			console.error(error);
-			platform.handleException(error);
-		}
+		if (error) platform.handleException(error);
 	});
 });
 
@@ -157,5 +151,5 @@ platform.once('close', function () {
 platform.once('ready', function (options) {
 	config = options;
 	platform.notifyReady();
-	platform.log('Stream has been initialized.');
+	platform.log('Artik Stream has been initialized.');
 });
