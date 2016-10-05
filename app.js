@@ -43,27 +43,20 @@ platform.on('sync', function (lastSyncDate) {
 				form: {
 					grant_type: 'client_credentials'
 				},
+				json: true,
 				auth: {
 					user: config.client_id,
 					pass: config.client_secret
 				}
 			}, (error, response, body) => {
-				done(error, body);
-			});
-		},
-		(tokenResponse, done) => {
-			async.waterfall([
-				async.constant(tokenResponse),
-				async.asyncify(JSON.parse)
-			], (parseError, obj) => {
-				if (parseError)
-					done(parseError);
-				else if (obj.error)
-					done(new Error(obj.error));
-				else if (isEmpty(obj.access_token))
+				if (error)
+					done(error);
+				else if (body.error || response.statusCode !== 200)
+					done(new Error(body.error.message || body.error));
+				else if (isEmpty(body.access_token))
 					done(new Error('Invalid Credentials. No access token was received.'));
 				else
-					done(null, obj.access_token);
+					done(null, body.access_token);
 			});
 		},
 		(token, done) => {
