@@ -1,17 +1,17 @@
 {
-  "client_id": {
+  "clientId": {
     "label": "Client ID",
     "type": "String",
     "required": true,
     "help": "Kindly specify the Client ID of your Artik Application."
   },
-  "client_secret": {
+  "clientSecret": {
     "label": "Client Secret",
     "type": "Password",
     "required": true,
     "help": "Kindly specify the Client Secret of your Artik Application."
   },
-  "user_id": {
+  "userId": {
     "label": "User ID",
     "type": "String",
     "required": true,
