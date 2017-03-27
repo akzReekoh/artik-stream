@@ -1,0 +1,37 @@
+---
+version: 1.0.0 # So we could parse new versions of the manifest without dropping support for older ones. The CLI should be able to parse the YAML file based on the version
+kind: Plugin # We will add other objects that can be uploaded in the registry like: Add-ons, full-blown applications, bots and others TBD
+metadata:
+  name: artik-stream
+  description: Samsung Artik Stream Plugin for the Reekoh IoT Platform. Fetch data from Samsung Artik Cloud and Devices for ingestion into a Reekoh instance.
+  documentation: ./README.md
+  icon: ./artik.png
+  signupLink:
+  type: Stream
+  price: 0
+  tags:
+    - samsung
+    - artik
+  config:
+    clientId:
+      label: Client ID
+      type: String
+      required: true
+      help: Kindly specify the Client ID of your Artik Application.
+      maxLength: 1000
+    clientSecret:
+      label: Client Secret
+      type: Password
+      required: true
+      help: Kindly specify the Client Secret of your Artik Application.
+    userId:
+      label: User ID
+      type: String
+      required: true
+      help: Kindly specify your Samsung Account/User ID.
+      maxLength: 1000
+  consumerType: pull
+  release:
+    version: 1.0.0
+    notes: path/to/RELEASENOTESv1.0.0.md
+    image: path/to/docker/image
